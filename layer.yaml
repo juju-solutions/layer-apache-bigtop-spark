@@ -1,0 +1,7 @@
+repo: git@github.com:juju-solutions/layer-apache-bigtop-spark.git
+includes:
+  - 'layer:apache-bigtop-base'
+  - 'layer:hadoop-client'
+options:
+  apache-bigtop-base:
+    bigtop_component_list: 'spark hadoop yarn'
