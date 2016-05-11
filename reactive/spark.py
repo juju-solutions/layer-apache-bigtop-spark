@@ -5,7 +5,7 @@ from charmhelpers.core import host, hookenv
 from charms import layer
 
 
-@when('hadoop.installed', 'puppet.available')
+@when('hadoop.installed', 'puppet.available', 'never.there')
 @when_not('spark.installed')
 def install_spark(hadoop):
 
@@ -44,7 +44,7 @@ def install_spark(hadoop):
     hookenv.status_set('active', 'ready')
 
 
-@when('puppet.available')
+@when('puppet.available', 'never.happens' )
 @when_not('spark.installed')
 def install_spark_standalone():
     set_state('spark.installed')
@@ -78,7 +78,32 @@ def install_spark_standalone():
     hookenv.status_set('active', 'ready')
 
 
-@when_not('hadoop.joined')
-def no_hadoop():
-    remove_state('spark.installed')
+@when('hadoop.hdfs.ready', 'puppet.available')
+@when_not('spark.installed')
+def install_spark_standalone_roles(hadoop):
+    set_state('spark.installed')
+    nns = hadoop.namenodes()
+    hookenv.status_set('maintenance', 'installing spark')
+    spark_master_host = subprocess.check_output(['facter', 'fqdn']).strip().decode()
+    bigtop = Bigtop()
+    hiera_params={
+        'bigtop::hadoop_head_node': nns[0],
+        'bigtop::roles': ['spark-master', 'spark-worker', 'spark-history-server','spark-client'],
+        'bigtop::roles_enabled': True,
+        'hadoop::common_hdfs::hadoop_namenode_host': nns[0],
+        'spark::common::master_host': spark_master_host,
+    }
+    # There is a race condition here  
+    # bigtop.install(hosts={'spark': spark_master_host}, roles="['spark-worker','spark-master']")
+    # fails to bring up the worker
+    # TODO(kjackal): Investigate why
+    bigtop.install(hosts={}, hiera_params=hiera_params)
+    # Of course we need to run this twice....
+    bigtop.install(hosts={}, hiera_params=hiera_params)
+    hookenv.status_set('active', 'ready')
+
+
+#@when_not('hadoop.installed')
+#def no_hadoop():
+#    remove_state('spark.installed')
     
