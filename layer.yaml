@@ -2,6 +2,7 @@ repo: git@github.com:juju-solutions/layer-apache-bigtop-spark.git
 includes:
   - 'layer:apache-bigtop-base'
   - 'layer:hadoop-client'
+  - 'interface:spark-quorum'
 options:
   apache-bigtop-base:
     bigtop_component_list: 'spark hadoop yarn'
