@@ -1,5 +1,5 @@
-name: bigtop-spark
-summary: Apache Bigtop gateway component
+name: apache-bigtop-spark
+summary: Apache Bitop Spark
 maintainer: Juju Big Data <bigdata@lists.ubuntu.com>
 description: >
   Hadoop is a software platform that lets one easily write and
@@ -7,8 +7,8 @@ description: >
 
   This charm provides a Spark via the Apache Bigtop Spark component.
 tags: ["applications", "bigdata", "hadoop", "apache"]
-
-peers:
-  sparkpeers:
-    interface: spark-quorum
-
+provides:
+  benchmark:
+    interface: benchmark
+  client:
+    interface: spark

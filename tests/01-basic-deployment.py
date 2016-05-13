@@ -6,18 +6,16 @@ import amulet
 
 class TestDeploy(unittest.TestCase):
     """
-    Trivial deployment test for Apache Bigtop Hive component.
-
-    This charm cannot do anything useful by itself, so integration testing
-    is done in the bundle.
+    Trivial deployment test for Apache Spark.
     """
-
-    def test_deploy(self):
+    def setUp(self):
         self.d = amulet.Deployment(series='trusty')
-        self.d.add('hive', 'apache-bitop-hive')
+        self.d.add('spark', 'apache-bigtop-spark')
         self.d.setup(timeout=900)
         self.d.sentry.wait(timeout=1800)
-        self.unit = self.d.sentry['hive'][0]
+
+    def test_deploy(self):
+        self.d.sentry.wait_for_messages({"spark": "Waiting for a relation to HDFS"})
 
 
 if __name__ == '__main__':
