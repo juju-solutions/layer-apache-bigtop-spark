@@ -3,6 +3,7 @@ includes:
   - 'layer:apache-bigtop-base'
   - 'layer:hadoop-client'
   - 'layer:leadership'
+  - 'interface:benchmark'
 options:
   hadoop-client:
     ports:

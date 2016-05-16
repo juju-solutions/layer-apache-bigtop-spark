@@ -5,7 +5,7 @@ from charmhelpers.core import host
 from charmhelpers.core import unitdata
 from jujubigdata import utils
 from charms.layer.apache_bigtop_base import Bigtop
-
+from charmhelpers.fetch.archiveurl import ArchiveUrlFetchHandler
 
 class Spark(object):
 
@@ -36,6 +36,35 @@ class Spark(object):
         utils.run_as('hdfs', 'hdfs', 'dfs', '-mkdir', '-p', events_dir)
         utils.run_as('hdfs', 'hdfs', 'dfs', '-chown', '-R', 'ubuntu:spark', events_dir)
 
+    def install_benchmark(self):
+        install_sb = hookenv.config()['spark_bench_enabled']
+        sb_dir = '/home/ubuntu/spark-bench'
+        if install_sb:
+            if not unitdata.kv().get('spark_bench.installed', False):
+                if utils.cpu_arch() == 'ppc64le':
+                    sb_url = hookenv.config()['spark_bench_ppc64le']
+                else:
+                    # TODO: may need more arch cases (go with x86 sb for now)
+                    sb_url = hookenv.config()['spark_bench_x86_64']
+
+                Path(sb_dir).rmtree_p()
+                au = ArchiveUrlFetchHandler()
+                au.install(sb_url, '/home/ubuntu')
+
+                # #####
+                # Handle glob if we use a .tgz that doesn't expand to sb_dir
+                # sb_archive_dir = glob('/home/ubuntu/spark-bench-*')[0]
+                # SparkBench expects to live in ~/spark-bench, so put it there
+                # Path(sb_archive_dir).rename(sb_dir)
+                # #####
+
+                unitdata.kv().set('spark_bench.installed', True)
+                unitdata.kv().flush(True)
+        else:
+            Path(sb_dir).rmtree_p()
+            unitdata.kv().set('spark_bench.installed', False)
+            unitdata.kv().flush(True)
+
     def setup(self):
         self.set_log_permissions()
         self.install_demo()
@@ -46,6 +75,7 @@ class Spark(object):
             self.setup()
             unitdata.kv().set('spark.bootstrapped', True)
 
+        self.install_benchmark()
         bigtop = Bigtop()
         hosts = {
             'namenode': available_hosts['namenode'],

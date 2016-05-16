@@ -14,7 +14,7 @@ job="$(action-get job)"
 job_args="$(action-get job-args)"
 cron="$(action-get cron)"
 
-submit_args='--master ${MASTER} --deploy-mode cluster'
+submit_args='--deploy-mode cluster'
 if [[ -n "$packages" ]]; then
     submit_args="$submit_args --packages $packages"
 fi

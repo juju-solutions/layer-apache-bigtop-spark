@@ -17,13 +17,12 @@ chown -R ubuntu:ubuntu ${RESULT_DIR}
 
 benchmark-start
 START=`date +%s`
-# NB: Escaped vars in the block below (e.g., \${MASTER}) come from
-# /etc/environment while non-escaped vars (e.g., ${NUM_PARTITIONS}) are
+# NB: Vars (e.g., ${NUM_PARTITIONS}) are
 # parameterized from this outer scope
 su ubuntu << EOF
 . /etc/environment
 echo 'calculating pi'
-spark-submit --master \${MASTER} --class org.apache.spark.examples.SparkPi \
+spark-submit --class org.apache.spark.examples.SparkPi \
   /usr/lib/spark/lib/spark-examples-*.jar ${NUM_PARTITIONS} &> ${RESULT_LOG}
 EOF
 STOP=`date +%s`

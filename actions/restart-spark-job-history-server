@@ -19,4 +19,4 @@ if not host.service_available('spark-history'):
     call(['action-fail', 'Spark history service not available'])
     sys.exit(1)
 
-host.service_restart('spark-history')
+host.service_restart('spark-history-server')
