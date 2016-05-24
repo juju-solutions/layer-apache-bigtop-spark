@@ -78,10 +78,19 @@ class Spark(object):
         return events_dir
 
     def configure(self, available_hosts):
-        # This is the core logic of setting up spark.
-        # Two flags are needed: 
-        # 1) Namenode exists aka HDFS is there
-        # 2) Resource manager exists aka YARN is ready
+        """
+        This is the core logic of setting up spark.
+
+        Two flags are needed:
+
+          * Namenode exists aka HDFS is there
+          * Resource manager exists aka YARN is ready
+
+        both flags are infered from the available hosts.
+
+        :param dict available_hosts: Hosts that Spark should know about.
+        """
+
         if not unitdata.kv().get('spark.bootstrapped', False):
             self.setup()
             unitdata.kv().set('spark.bootstrapped', True)
@@ -121,9 +130,6 @@ class Spark(object):
         bigtop.trigger_puppet()
         if 'namenode' not in available_hosts:
             # Make sure users other than spark can access the events logs dir and run jobs
-            # TODO KJackal make this more elegant
-            # History server will show jobs of spark user only.
-            # See http://spark.apache.org/docs/latest/security.html#event-logging
             utils.run_as('root', 'chmod', '777', dc.path('spark_events'))
 
     def install_demo(self):
