@@ -1,4 +1,4 @@
-from charms.reactive import when, when_not, is_state, set_state, remove_state, when_any
+from charms.reactive import RelationBase, when, when_not, is_state, set_state, remove_state, when_any
 from charms.layer.apache_bigtop_base import get_fqdn
 from charms.layer.bigtop_spark import Spark
 from charmhelpers.core import hookenv
@@ -30,81 +30,77 @@ def report_status():
     hookenv.status_set('active', 'Ready ({})'.format(mode))
 
 
-def install_spark(hadoop, yarn=False):
+def install_spark(hadoop=None):
     spark_master_host = leadership.leader_get('master-fqdn')
-    nns = hadoop.namenodes()
     hosts = {
-        'namenode': nns[0],
         'spark-master': spark_master_host,
     }
 
-    if yarn:
+    if is_state('hadoop.yarn.ready'):
         rms = hadoop.resourcemanagers()
         hosts['resourcemanager'] = rms[0]
+
+    if is_state('hadoop.hdfs.ready'):
+        nns = hadoop.namenodes()
+        hosts['namenode'] = nns[0]
 
     dist = get_dist_config()
     spark = Spark(dist)
     spark.configure(hosts)
 
-@when_any('spark.standalone.installed', 'spark.yarn.installed' )
-@when('config.changed', 'hadoop.hdfs.ready')
-def reconfigure_spark(hadoop):
-    config = hookenv.config()
-    mode = hookenv.config()['spark_execution_mode']
-    hookenv.status_set('maintenance', 
-                       'Changing default execution mode to {}'.format(mode))
 
-    yarn = False
-    if is_state('hadoop.yarn.ready'):
-        yarn = True
-
-    install_spark(hadoop, yarn)
-    report_status()
-
-
-@when('hadoop.hdfs.ready', 'bigtop.available')
-@when_not('spark.ready.to.install')
-def ready_to_install(hadoop):
-    set_state('spark.ready.to.install')
-
-
-@when_any('leadership.changed.master-fqdn', 'spark.ready.to.install')
-@when('hadoop.hdfs.ready', 'bigtop.available')
-@when_not('hadoop.yarn.ready')
-def install_spark_standalone(hdfs):
-    spark_master_host = leadership.leader_get('master-fqdn')
-    if (not data_changed('master-host', spark_master_host)) and \
-       is_state('spark.standalone.installed'):
-        return
-
-    hookenv.status_set('maintenance', 'Installing spark standalone')
-    install_spark(hdfs)
+@when('bigtop.available')
+@when_not('spark.started')
+def first_install_spark():
+    hookenv.status_set('maintenance', 'Installing Apache Bitgop Spark')
+    install_spark()
     set_deployment_mode_state('spark.standalone.installed')
     report_status()
 
 
-@when_any('leadership.changed.master-fqdn', 'spark.ready.to.install')
-@when('hadoop.hdfs.ready', 'hadoop.yarn.ready', 'bigtop.available')
-def install_spark_yarn(hdfs, yarn):
-    spark_master_host = leadership.leader_get('master-fqdn')
-    if (not data_changed('master-host', spark_master_host)) and \
-       is_state('spark.yarn.installed'):
-        return
+@when('config.changed', 'spark.started')
+def reconfigure_spark():
+    config = hookenv.config()
+    mode = config['spark_execution_mode']
+    hookenv.status_set('maintenance',
+                       'Changing default execution mode to {}'.format(mode))
 
-    hookenv.status_set('maintenance', 'Installing spark yarn')
-    install_spark(hdfs, yarn=True)
-    set_deployment_mode_state('spark.yarn.installed')
+    hadoop = (RelationBase.from_state('hadoop.yarn.ready') or
+              RelationBase.from_state('hadoop.hdfs.ready'))
+
+    install_spark(hadoop)
     report_status()
 
 
+# This is a triky call. We want to fire when the leader changes, yarn and hdfs become ready or
+# depart. In the future this should fire when Cassandra or any other storage
+# becomes ready or departs. Since hdfs and yarn do not have a departed state we make sure
+# we fire this method always ('spark.started'). We then build a deployment-matrix
+# and if anything has changed we re-install.
+# 'hadoop.yarn.ready', 'hadoop.hdfs.ready' can be ommited but I like them here for clarity
+@when_any('leadership.changed.master-fqdn', 'hadoop.yarn.ready', 'hadoop.hdfs.ready', 'spark.started')
 @when('bigtop.available')
-@when_not('hadoop.hdfs.ready')
-def blocked_on_hdfs():
-    dist = get_dist_config()
-    spark = Spark(dist)
-    spark.stop()
-    remove_state('spark.started')
-    hookenv.status_set('blocked', 'Waiting for a relation to HDFS')
+def reinstall_spark():
+    spark_master_host = leadership.leader_get('master-fqdn')
+    deployment_matrix = {
+        'spark_master': spark_master_host,
+        'yarn_ready': is_state('hadoop.yarn.ready'),
+        'hdfs_ready': is_state('hadoop.hdfs.ready'),
+    }
+
+    if not data_changed('deployment_matrix', deployment_matrix):
+        return
+
+    hookenv.status_set('maintenance', 'Configuring Spark')
+    hadoop = (RelationBase.from_state('hadoop.yarn.ready') or
+              RelationBase.from_state('hadoop.hdfs.ready'))
+    install_spark(hadoop)
+    if is_state('hadoop.yarn.ready'):
+        set_deployment_mode_state('spark.yarn.installed')
+    else:
+        set_deployment_mode_state('spark.standalone.installed')
+
+    report_status()
 
 
 @when('leadership.is_leader', 'bigtop.available')
@@ -123,5 +119,3 @@ def client_present(client):
 @when_not('spark.started')
 def client_should_stop(client):
     client.clear_spark_started()
-
-

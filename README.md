@@ -1,6 +1,7 @@
 ## Overview
 
 ### Spark Cluster
+
 Apache Spark™ is a fast and general purpose engine for large-scale data
 processing. Key features:
 
@@ -26,21 +27,17 @@ processing. Key features:
 
 ## Deployment
 
-This charm allows the deployment of Apache Spark backaged y Bigtop
+This charm allows the deployment of Apache Spark backaged by Bigtop
 in the modes described below:
 
  * **Standalone**
 
  In this mode Spark units form a cluster that you can scale to match your needs.
  Starting with a single node:
-    
-    juju deploy apache-bigtop-namenode namenode
-    juju deploy apache-bigtop-slave slave
-    juju deploy apache-bigtop-plugin plugin
+
     juju deploy apache-bigtop-spark spark
-    juju add-relation slave namenode
-    juju add-relation namenode plugin
-    juju add-relation spark plugin
+    juju deploy openjdk
+    juju add-relation spark openjdk
 
  You can scale the cluster by adding more spark units:
 
@@ -51,8 +48,7 @@ in the modes described below:
  while the rest of the units display a status of  "Ready (standalone)".
  In case you remove the master unit Juju will appoint a new master to the cluster.
  However, should a master fail in this standalone mode the cluster will stop functioning
- properly. Master node failures is handled properly when Apache spark is setup in
- High Availability mode (Standalone HA).
+ properly.
 
  * **Yarn-client and Yarn-cluster**
 
@@ -64,7 +60,7 @@ in the modes described below:
  unit that communicates with the cluster by relating to the
  `apache-hadoop-plugin` subordinate charm:
 
-    juju-quickstart apache-hadoop-spark
+    juju-quickstart bigtop-processing-spark
 
 
 Note: To transition among execution modes you need to set the

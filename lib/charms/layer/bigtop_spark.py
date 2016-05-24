@@ -7,6 +7,7 @@ from jujubigdata import utils
 from charms.layer.apache_bigtop_base import Bigtop
 from charmhelpers.fetch.archiveurl import ArchiveUrlFetchHandler
 
+
 class Spark(object):
 
     def __init__(self, dist_config):
@@ -30,11 +31,6 @@ class Spark(object):
             roles.append('spark-master')
             roles.append('spark-history-server')
         return roles
-
-    def set_log_permissions(self):
-        events_dir = 'hdfs:///var/log/spark/'
-        utils.run_as('hdfs', 'hdfs', 'dfs', '-mkdir', '-p', events_dir)
-        utils.run_as('hdfs', 'hdfs', 'dfs', '-chown', '-R', 'ubuntu:spark', events_dir)
 
     def install_benchmark(self):
         install_sb = hookenv.config()['spark_bench_enabled']
@@ -66,21 +62,50 @@ class Spark(object):
             unitdata.kv().flush(True)
 
     def setup(self):
-        self.set_log_permissions()
+        self.dist_config.add_users()
+        self.dist_config.add_dirs()
         self.install_demo()
         self.open_ports()
 
+    def setup_hdfs_logs(self):
+        # create hdfs storage space for history server
+        dc = self.dist_config
+        events_dir = dc.path('spark_events')
+        events_dir = 'hdfs://{}'.format(events_dir)
+        utils.run_as('hdfs', 'hdfs', 'dfs', '-mkdir', '-p', events_dir)
+        utils.run_as('hdfs', 'hdfs', 'dfs', '-chown', '-R', 'ubuntu:spark',
+                     events_dir)
+        return events_dir
+
     def configure(self, available_hosts):
+        """
+        This is the core logic of setting up spark.
+
+        Two flags are needed:
+
+          * Namenode exists aka HDFS is there
+          * Resource manager exists aka YARN is ready
+
+        both flags are infered from the available hosts.
+
+        :param dict available_hosts: Hosts that Spark should know about.
+        """
+
         if not unitdata.kv().get('spark.bootstrapped', False):
             self.setup()
             unitdata.kv().set('spark.bootstrapped', True)
 
         self.install_benchmark()
-        bigtop = Bigtop()
+
         hosts = {
-            'namenode': available_hosts['namenode'],
             'spark': available_hosts['spark-master'],
         }
+
+        dc = self.dist_config
+        events_log_dir = 'file://{}'.format(dc.path('spark_events'))
+        if 'namenode' in available_hosts:
+            hosts['namenode'] = available_hosts['namenode']
+            events_log_dir = self.setup_hdfs_logs()
 
         if 'resourcemanager' in available_hosts:
             hosts['resourcemanager'] = available_hosts['resourcemanager']
@@ -89,8 +114,11 @@ class Spark(object):
 
         override = {
             'spark::common::master_url': self.get_master_url(available_hosts['spark-master']),
+            'spark::common::event_log_dir': events_log_dir,
+            'spark::common::history_log_dir': events_log_dir,
         }
 
+        bigtop = Bigtop()
         bigtop.render_site_yaml(hosts, roles, override)
         bigtop.trigger_puppet()
         # There is a race condition here.
@@ -98,8 +126,11 @@ class Spark(object):
         # The exception in /var/logs/spark:
         # Exception in thread "main" org.apache.spark.SparkException: Invalid master URL: spark://:7077
         # The master url is not set at the time the worker start the first time.
-        # TODO(kjackal): ...do the needed... (investiate,debug,submit patch) 
+        # TODO(kjackal): ...do the needed... (investiate,debug,submit patch)
         bigtop.trigger_puppet()
+        if 'namenode' not in available_hosts:
+            # Make sure users other than spark can access the events logs dir and run jobs
+            utils.run_as('root', 'chmod', '777', dc.path('spark_events'))
 
     def install_demo(self):
         '''

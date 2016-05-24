@@ -4,8 +4,14 @@ includes:
   - 'layer:hadoop-client'
   - 'layer:leadership'
   - 'interface:benchmark'
+  - 'interface:spark'
 options:
   hadoop-client:
+    groups:
+        - 'hadoop'
+    dirs:
+      spark_events:
+        path: '/var/log/spark/apps'
     ports:
       # Ports that need to be exposed, overridden, or manually specified.
       # Only expose ports serving a UI or external API (i.e., namenode and
