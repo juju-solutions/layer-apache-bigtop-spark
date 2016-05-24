@@ -1,6 +1,7 @@
 ## Overview
 
 ### Spark Cluster
+
 Apache Spark™ is a fast and general purpose engine for large-scale data
 processing. Key features:
 
@@ -33,7 +34,7 @@ in the modes described below:
 
  In this mode Spark units form a cluster that you can scale to match your needs.
  Starting with a single node:
-    
+
     juju deploy apache-bigtop-spark spark
     juju deploy openjdk
     juju add-relation spark openjdk
@@ -59,7 +60,7 @@ in the modes described below:
  unit that communicates with the cluster by relating to the
  `apache-hadoop-plugin` subordinate charm:
 
-    juju-quickstart apache-bigtop-processing-spark
+    juju-quickstart bigtop-processing-spark
 
 
 Note: To transition among execution modes you need to set the
